@@ -2,13 +2,12 @@ import asyncio
 import psutil
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi import Body
-
-from SolarServers_core import SolarServerCore
+from SolarServers_core import SolarServersCore
 
 app = FastAPI()
-core = SolarServerCore()
+core = SolarServersCore()
 
-INTERVAL = 0.25
+INTERVAL = 0.2
 
 @app.on_event("startup")
 async def on_startup():
@@ -19,19 +18,31 @@ async def on_startup():
 async def on_shutdown():
     print("SolarServers server shutting")
 
+@app.get("/")
+def root():
+    return {"status": "Server alive"}
+
 @app.websocket("/ws")
 async def websocket_stream(ws: WebSocket):
     await ws.accept()
-    print("WebSocket client connected")
+    print("WS client connected")
+
     try:
         while True:
-            packet = core.get_packet()
-            await ws.send_json(packet)
+            try:
+                packet = core.get_packet()
+                await ws.send_json(packet)
+                print(f"Sent packet with {len(packet['connections'])} connections")
+            except Exception as e:
+                print("Error scanning core:", e)
+                await ws.send_json({"meta": core.meta, "connections": []})
+
             await asyncio.sleep(INTERVAL)
     except WebSocketDisconnect:
-        print("WebSocket client disconnected")
+        print("WS client disconnected")
     except Exception as e:
-        print(f"Error: {e}")
+        print("Error:", e)
+
 
 @app.post("/kill")
 def kill_process(pid: int = Body(..., embed = True)):
