@@ -20,7 +20,7 @@ try:
 except ImportError:
     AI_AVAILABLE = False
 
-class SolarServerCore:
+class SolarServersCore:
     def __init__(self):
         self.pid = os.getpid()
         self.name_cache = {}
@@ -117,7 +117,7 @@ class SolarServerCore:
         }
 
 if __name__ == "__main__":
-    core = SolarServerCore()
+    core = SolarServersCore()
     pkt = core.get_packet()
     print(f"\nFound {len(pkt['connections'])} connections")
     for c in pkt["connections"][:10]:
