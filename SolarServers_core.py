@@ -2,6 +2,7 @@ import psutil as ps
 import os
 import ctypes
 from typing import List, Dict
+import numpy as np
 
 IGNORE_APPS = [
     'svchost.exe','system','searchhost.exe','runtimebroker.exe',
@@ -86,21 +87,18 @@ class SolarServerCore:
                 continue
 
             entry = {
-                "id": f"{app_name}_{c.pid}",
-                "app": app_name,
-                "pid": c.pid,
-                "ip": c.raddr.ip,
-                "port": c.raddr.port,
+                "id": str(f"{app_name}_{c.pid}"),
+                "app": str(app_name),
+                "pid": int(c.pid),
+                "ip": str(c.raddr.ip) if c.raddr and c.raddr.ip else "0.0.0.0",
+                "port": int(c.raddr.port) if c.raddr and c.raddr.port else 0,
             }
+
 
             # AI classification
             if self.ai:
                 try:
-                    entry["is_threat"] = self.ai.predict_threat(
-                        entry["ip"],
-                        entry["port"],
-                        "ESTABLISHED"
-                    )
+                    entry["is_threat"] = bool(np.asscalar(np.array(self.ai.predict_threat(entry["ip"], entry["port"], "ESTABLISHED"))))
                 except Exception:
                     entry["is_threat"] = False
             else:
