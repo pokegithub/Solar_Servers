@@ -1,86 +1,112 @@
 import psutil as ps
-import os as o
-import ctypes as c
-ig = [
+import os
+import ctypes
+from typing import List, Dict
+
+IGNORE_APPS = [
     'svchost.exe','system','searchhost.exe','runtimebroker.exe',
     'smartscreen.exe','spoolsv.exe','lsass.exe','services.exe',
     'wininit.exe','csrss.exe','dwm.exe','sihost.exe',
     'taskhostw.exe','ctfmon.exe','conhost.exe','dllhost.exe',
     'backgroundtaskhost.exe','systemsettings.exe','settingsynchost.exe',
     'microsoftedgeupdate.exe','windowsupdatebox.exe',
-    'msmpeng.exe','nissrv.exe','securityhealthservice.exe',
-    'msseces.exe','avgnt.exe','avp.exe','ekrn.exe',
-    'mbamservice.exe','norton*.exe','mcafee*.exe',
-    'onedrive.exe','dropbox.exe','googledrivesync.exe',
-    'wuauclt.exe','trustedinstaller.exe','msiexec.exe',
-    'system/hidden'
+    'msmpeng.exe','nissrv.exe','securityhealthservice.exe'
 ]
-wl = [
-    'chrome.exe','firefox.exe','brave.exe','msedge.exe',
-    'discord.exe','slack.exe','telegram.exe',
-    'spotify.exe','vlc.exe',
-    'steam.exe','epicgameslauncher.exe'
-]
-class SS:
+
+try:
+    from ai_engine import predict
+    AI_AVAILABLE = True
+except ImportError:
+    AI_AVAILABLE = False
+
+class SystemXCore:
     def __init__(self):
-        self.ig = ig
-        self.wl = wl
-        self.nc = {}
-        self.pid = o.getpid()
-        self.hw = self.hw_scan()
-        self.a
-        print(f"SYSTEMSERVERS READY | PID {self.pid}")
-        print(f"HARDWARE {self.hw}")
-    def hw_scan(self):
+        self.pid = os.getpid()
+        self.name_cache = {}
+        self.meta = self._hardware_scan()
+        print(f"SolarServers Core Online | PID {self.pid}")
+        print(f"Meta: {self.meta}")
+
+    def _hardware_scan(self) -> Dict:
         try:
-            ram = ps.virtual_memory().total / (1024**3)
+            ram = ps.virtual_memory().total / (1024 ** 3)
         except:
             ram = 2.0
+
         try:
-            adm = o.getuid() == 0
+            is_admin = os.getuid() == 0
         except:
             try:
-                adm = c.windll.shell32.IsUserAnAdmin() != 0
+                is_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0
             except:
-                adm = False
-        self.a = {"tier": "POTATO" if ram <= 2 else ("STANDARD" if ram<= 8 else ("HIGH" if ram <= 16 else "PEAK")),
-            "ram": round(ram,2),
-            "admin": adm}
-        return self.a
-    def scan(self):
-        out = []
+                is_admin = False
+
+        tier = "HIGH_END" if ram >= 8 else "LOW_END"
+
+        return {
+            "tier": tier,
+            "is_admin": is_admin,
+            "ram_gb": round(ram, 2)
+        }
+    def _scan_connections(self) -> List[Dict]:
+        results = []
+
         try:
-            con = ps.net_connections(kind="inet")
-        except:
-            return [{"err":"admin needed"}]
-        for x in con:
-            if x.pid in (None,self.pid):
+            connections = ps.net_connections(kind="inet")
+        except Exception:
+            return results  # Always safe fallback
+
+        for c in connections:
+            if not c.pid or not c.raddr:
                 continue
-            if x.status != "ESTABLISHED":
+            if c.pid == self.pid:
                 continue
-            if not x.raddr:
+            if c.status != "ESTABLISHED":
                 continue
-            if x.pid not in self.nc:
+
+            if c.pid not in self.name_cache:
                 try:
-                    self.nc[x.pid] = ps.Process(x.pid).name()
+                    self.name_cache[c.pid] = ps.Process(c.pid).name()
                 except:
-                    self.nc[x.pid] = "System/Hidden"
-            n = self.nc[x.pid]
-            if n.lower() in [i.lower() for i in self.ig]:
+                    self.name_cache[c.pid] = "System/Hidden"
+
+            app_name = self.name_cache[c.pid]
+
+            if app_name.lower() in [i.lower() for i in IGNORE_APPS]:
                 continue
-            out.append({
-                "app": n,
-                "lp": x.laddr.port,
-                "rip": x.raddr.ip,
-                "rp": x.raddr.port,
-                "st": x.status
-            })
-        return out
-e = SS()
-print("\nScanning...\n")
-d = e.scan()
-print(f"Found {len(d)} connections\n")
-for i,v in enumerate(d[:10]):
-    print(f"[{i+1}] {v['app']} -> {v['rip']}:{v['rp']}")
-if len(d) > 10:
-    print(f"... +{len(d)-10} more")
+
+            entry = {
+                "id": f"{app_name}_{c.pid}",
+                "app": app_name,
+                "pid": c.pid,
+                "ip": c.raddr.ip,
+                "port": c.raddr.port,
+            }
+
+            # AI classification
+            if AI_AVAILABLE:
+                try:
+                    entry["is_threat"] = bool(predict(entry))
+                except:
+                    entry["is_threat"] = False
+            else:
+                entry["is_threat"] = False
+
+            results.append(entry)
+
+        return results
+    def get_packet(self) -> Dict:
+        return {
+            "meta": {
+                "tier": self.meta["tier"],
+                "is_admin": self.meta["is_admin"]
+            },
+            "connections": self._scan_connections()
+        }
+
+if __name__ == "__main__":
+    core = SystemXCore()
+    pkt = core.get_packet()
+    print(f"\nFound {len(pkt['connections'])} connections")
+    for c in pkt["connections"][:10]:
+        print(f"{c['app']} -> {c['ip']}:{c['port']}")
