@@ -89,9 +89,9 @@ function removePlanet(id) {
 function sunMesh() {
     const geometry = tier === "HIGH_END" ? new THREE.SphereGeometry(4 * 2, 32, 32) : new THREE.IcosahedronGeometry(4 * 2, 1);
     const material = new THREE.MeshStandardMaterial({
-        color: 0xffdd55,        // more yellow, less orange
-    emissive: 0xffee88,     // warm yellow glow
-    emissiveIntensity: 2.0
+        color: 0xffdd55,
+        emissive: 0xffee88,
+        emissiveIntensity: 2.0
     });
     sun = new THREE.Mesh(geometry, material);
     sun.position.set(0, 0, 0);
@@ -125,7 +125,6 @@ function createPlanetMesh(tier, isThreat) {
     mesh.orbitAngle = Math.random() * Math.PI * 2;
     mesh.orbitSpeed = (0.01 + Math.random() * 0.02);
 
-    // 🔴 threat metadata
     mesh.isThreat = isThreat;
     mesh.pulsePhase = Math.random() * Math.PI * 2;
 
@@ -225,7 +224,6 @@ function animate() {
 
     planet.position.lerp(planet.targetPosition, 0.08);
 
-    // 🔴 Pulse ONLY malicious planets
     if (planet.isThreat) {
         planet.pulsePhase += 0.05;
         planet.material.emissiveIntensity =
@@ -283,3 +281,4 @@ window.addEventListener("resize", () => {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
