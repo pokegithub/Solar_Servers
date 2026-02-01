@@ -32,6 +32,7 @@ except ImportError:
 
 class SolarServersCore:
     def __init__(self):
+        self.dns_cache = {}
         self.pid = os.getpid()
         self.name_cache = {}
         self.meta = self._hardware_scan()
@@ -107,9 +108,9 @@ class SolarServersCore:
 
             entry = {
                 "id": (
-                    f"{app_name}:{domain}"
+                    f"{app_name}_{domain}_{c.raddr.ip}_{c.raddr.port}"
                     if isBrowser and domain
-                    else f"{app_name}_{c.pid}"
+                    else f"{app_name}_{c.pid}_{c.raddr.ip}_{c.raddr.port}"
                 ),
                 "app": str(app_name),
                 "pid": int(c.pid),
@@ -137,10 +138,17 @@ class SolarServersCore:
         return results
     
     def _resolve_domain(self, ip: str) -> str:
+        if ip in self.dns_cache:
+            return self.dns_cache[ip]
+
         try:
-            return socket.gethostbyaddr(ip)[0]
+            domain = socket.gethostbyaddr(ip)[0]
         except Exception:
-            return ip
+            domain = ip
+
+        self.dns_cache[ip] = domain
+        return domain
+
 
     def get_packet(self) -> Dict:
         return {
