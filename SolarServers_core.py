@@ -122,7 +122,7 @@ class SolarServersCore:
 
             if self.ai:
                 try:
-                    entry["is_threat"] = bool(np.array(self.ai.predict_threat(entry["ip"], entry["port"], "ESTABLISHED")).item())
+                    entry["is_threat"] = bool(np.array(self.ai.predict_threat(entry["ip"], entry["port"], "ESTABLISHED", entry.get("domain"))).item())
                 except Exception:
                     entry["is_threat"] = False
             else:
