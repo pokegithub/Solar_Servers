@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "OrbitControls";
 
-let scene, camera, renderer, ws, sun, controls;
+let scene, camera, renderer, ws, sun, controls, raycaster, mouse, tooltip, selectPlanet = null;
 const planets = {};
 const beams = {};          
 let tier = "LOW_END";      
@@ -62,7 +62,23 @@ function initRenderer(tier) {
     scene.add(new THREE.AmbientLight(0x404040));
 
     sunMesh();
-}
+
+    raycaster = new THREE.Raycaster();
+    mouse = new THREE.Vector2();
+
+    const tooltip = document.createElement("div");
+    tooltip.id = "planet-tooltip";
+    tooltip.style.position = "fixed";
+    tooltip.style.pointerEvents = "none";
+    tooltip.style.background = "rgba(0,0,0,0.75)";
+    tooltip.style.color = "#fff";
+    tooltip.style.padding = "6px 8px";
+    tooltip.style.borderRadius = "6px";
+    tooltip.style.fontSize = "12px";
+    tooltip.style.display = "none";
+    tooltip.style.zIndex = "1000";
+    document.body.appendChild(tooltip);
+    }
 
 function registerPlanet(id, mesh) {
     planets[id] = mesh;
@@ -184,9 +200,20 @@ function updateFromPacket(packet) {
             if (Object.keys(planets).length >= maxPlanets) return;
 
             const mesh = createPlanetMesh(tier, conn.is_threat);
+            mesh.userData = {
+                app: conn.app,
+                ip: conn.ip,
+                port: conn.port,
+                pid: conn.pid,
+                "type": conn.type,
+                "domain": conn.domain,
+                isThreat: conn.is_threat
+            };
+
             mesh.orbitRadius = radius;
             mesh.orbitAngle = Math.random() * Math.PI * 2; 
             mesh.orbitSpeed = 0.085 / radius;
+            mesh.connectionData = conn;
             registerPlanet(id, mesh);
         }
 
@@ -207,6 +234,50 @@ function updateFromPacket(packet) {
 
 function animate() {
     requestAnimationFrame(animate);
+
+    const tooltip = document.getElementById("planet-tooltip");
+
+    if (selectPlanet) {
+        const d = selectPlanet.userData;
+        const vector = selectPlanet.position.clone();
+        vector.project(camera);
+        const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+
+        tooltip.style.left = `${x+12}px`;
+        tooltip.style.top = `${y+12}px`;
+        tooltip.style.display = "block";
+
+        tooltip.innerHTML = `
+            <strong>${d.type === "browser" ? "Website" : "Process"}</strong><br>
+            ${d.domain ? `🌐 ${d.domain}<br>` : ""}
+            App: ${d.app}<br>
+            IP: ${d.ip}:${d.port}<br>
+            ${d.isThreat ? "🔴 Malicious" : "🟢 Normal"}
+        `;
+    }
+
+    raycaster.setFromCamera(mouse, camera);
+
+    
+
+    //if (intersects.length > 0) {
+    //    const planet = intersects[0].object;
+    //    const d = planet.userData;
+//
+    //    if (d) {
+    //        tooltip.style.display = "block";
+    //        tooltip.innerHTML = `
+    //            <strong>${d.app}</strong><br/>
+    //            IP: ${d.ip}:${d.port}<br/>
+    //            PID: ${d.pid}<br/>
+    //            ${d.isThreat ? "Malicious" : "Normal"}
+    //        `;
+    //    }
+    //} else {
+    //    tooltip.style.display = "none";
+    //}
+
 
     if (sun) {
         const scale = 1 + Math.sin(Date.now() * 0.002) * 0.03;
@@ -275,6 +346,27 @@ setTier("LOW_END");
 initRenderer(tier);
 initWebSocket();
 animate();
+
+window.addEventListener("mousemove", (event) => {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    const tooltip = document.getElementById("planet-tooltip");
+    tooltip.style.left = event.clientX + 12 + "px";
+    tooltip.style.top = event.clientY + 12 + "px";
+});
+
+window.addEventListener("click", () => {
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(Object.values(planets));
+    if (intersects.length > 0) {
+        selectPlanet = intersects[0].object;
+    } else {
+        selectPlanet = null;
+        const tooltip = document.getElementById("planet-tooltip");
+        tooltip.style.display = "none";
+    }
+})
 
 window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
