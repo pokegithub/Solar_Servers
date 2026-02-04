@@ -3,7 +3,8 @@ import os
 import numpy as np
 import pandas as pd
 import re
-
+import warnings
+warnings.filterwarnings("ignore", message=".*sklearn.utils.parallel.delayed.*")
 class AIEngine:
     def __init__(self):
         self.model = None
@@ -216,3 +217,4 @@ print("\nPort Tests:")
 print(f"Port 443: {'THREAT' if e.predict_threat('', 443) else 'SAFE'}")
 print(f"Port 4444: {'THREAT' if e.predict_threat('', 4444) else 'SAFE'}")
 print(f"Port 6666: {'THREAT' if e.predict_threat('', 6666) else 'SAFE'}")
+
